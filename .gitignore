@@ -1,2 +1,29 @@
 .venv/
 __pycache__/
+
+# Bytecode
+*.py[cod]
+
+# Virtual environments
+venv/
+env/
+
+# Python environment files
+.env
+.env.*
+
+# Secrets / service account keys
+*.json
+
+# Editor / OS
+.vscode/
+Thumbs.db
+.DS_Store
+
+# Testing / caches
+.pytest_cache/
+.mypy_cache/
+
+# Build / distribution
+build/
+dist/
