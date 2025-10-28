@@ -6,6 +6,7 @@ import os
 import firebase_admin
 from fastapi import Header, HTTPException, status
 from firebase_admin import auth as fb_auth
+from reps.firestore import fs
 
 
 if not firebase_admin._apps:
@@ -41,8 +42,23 @@ def get_user(x_firebase_token: str | None = Header(default=None)) -> dict[str, s
             detail="invalid token",
         ) from exc
 
+    uid = decoded["uid"]
+    
+    # Try to get user profile from Firestore
+    user_ref = fs().collection("users").document(uid)
+    user_doc = user_ref.get()
+    
+    if user_doc.exists:
+        user_data = user_doc.to_dict()
+        return {
+            "uid": uid,
+            "roles": user_data.get("roles", []),
+            "branchId": user_data.get("branchId"),
+        }
+    
+    # Fallback to token claims if no Firestore profile exists
     return {
-        "uid": decoded["uid"],
+        "uid": uid,
         "roles": decoded.get("roles", []),
         "branchId": decoded.get("branchId"),
     }
