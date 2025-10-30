@@ -50,39 +50,45 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <div className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
-        <div className="max-w-6xl mx-auto p-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">SHDS Admin Dashboard</h1>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-sm">
-              <div className="font-medium">{user?.displayName || "User"}</div>
-              <div className="opacity-80">{user?.email}</div>
+        <div className="max-w-6xl mx-auto p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-2 sm:mb-0">
+            <h1 className="text-lg sm:text-xl font-semibold">SHDS Admin Dashboard</h1>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
+                <AvatarFallback>{initials}</AvatarFallback>
+              </Avatar>
+              <Button variant="destructive" size="sm" onClick={() => logout()}>Logout</Button>
             </div>
-            <Avatar>
-              <AvatarFallback>{initials}</AvatarFallback>
-            </Avatar>
-            <Button variant="destructive" onClick={() => logout()}>Logout</Button>
+          </div>
+          <div className="sm:hidden text-xs opacity-90 truncate">
+            {user?.email}
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-4">
+      <div className="max-w-6xl mx-auto p-3 sm:p-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Overview</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">Overview</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6">
             <Tabs defaultValue="students">
-              <TabsList>
-                <TabsTrigger value="students">Student Info</TabsTrigger>
-                <TabsTrigger value="attendance">Attendance Info</TabsTrigger>
-                <TabsTrigger value="fees">Fees Info</TabsTrigger>
+              <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:inline-flex">
+                <TabsTrigger value="students" className="text-xs sm:text-sm">Student Info</TabsTrigger>
+                <TabsTrigger value="attendance" className="text-xs sm:text-sm">Attendance</TabsTrigger>
+                <TabsTrigger value="fees" className="text-xs sm:text-sm">Fees</TabsTrigger>
               </TabsList>
-              <TabsContent value="students">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm text-muted-foreground">Students in your branch</div>
-                  <Button size="sm" variant="outline" onClick={fetchStudents} disabled={loadingStudents}>Refresh</Button>
+              <TabsContent value="students" className="mt-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-xs sm:text-sm text-muted-foreground">Students in your branch</div>
+                  <Button size="sm" variant="outline" onClick={fetchStudents} disabled={loadingStudents}>
+                    <span className="hidden sm:inline">Refresh</span>
+                    <span className="sm:hidden">↻</span>
+                  </Button>
                 </div>
-                <div className="rounded-md border">
+                
+                {/* Desktop Table View */}
+                <div className="hidden sm:block rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -106,6 +112,33 @@ export default function DashboardPage() {
                       )}
                     </TableBody>
                   </Table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="sm:hidden space-y-3">
+                  {students.map((s) => (
+                    <Card key={s.id}>
+                      <CardContent className="p-4">
+                        <div className="space-y-2">
+                          <div>
+                            <div className="text-xs text-muted-foreground">Name</div>
+                            <div className="font-medium">{s.name}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground">Guardian Phone</div>
+                            <div>{s.guardianPhone}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground">Student ID</div>
+                            <div className="text-sm text-muted-foreground">{s.id}</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {students.length === 0 && (
+                    <div className="text-center text-muted-foreground py-8 text-sm">No students yet</div>
+                  )}
                 </div>
               </TabsContent>
               <TabsContent value="attendance">
