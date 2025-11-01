@@ -42,23 +42,8 @@ def get_user(x_firebase_token: str | None = Header(default=None)) -> dict[str, s
             detail="invalid token",
         ) from exc
 
-    uid = decoded["uid"]
-    
-    # Try to get user profile from Firestore
-    user_ref = fs().collection("users").document(uid)
-    user_doc = user_ref.get()
-    
-    if user_doc.exists:
-        user_data = user_doc.to_dict()
-        return {
-            "uid": uid,
-            "roles": user_data.get("roles", []),
-            "branchId": user_data.get("branchId"),
-        }
-    
-    # Fallback to token claims if no Firestore profile exists
     return {
-        "uid": uid,
+        "uid": decoded["uid"],
         "roles": decoded.get("roles", []),
         "branchId": decoded.get("branchId"),
     }
