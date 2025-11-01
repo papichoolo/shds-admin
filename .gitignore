@@ -1,3 +1,48 @@
+# Root gitignore for shds-admin
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+venv/
+.venv/
+
+# Environment files
+.env
+.env.*
+*.env
+*.local
+
+# --- Node/Next.js ---
+node_modules/
+.next/
+web/.next/
+web/node_modules/
+web/.env*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Service account / credentials (never commit) ---
+*service-account*.json
+*firebase-adminsdk*.json
+*credentials*.json
+*.key.json
+*.pem
+*.p12
+
+# --- Frontend legacy secrets ---
+frontend/config.js
+frontend/_legacy/config.js
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
 .venv/
 __pycache__/
 
@@ -15,6 +60,9 @@ env/
 # Secrets / service account keys
 *.json
 
+# Firebase config (frontend)
+frontend/config.js
+
 # Editor / OS
 .vscode/
 Thumbs.db
@@ -23,6 +71,7 @@ Thumbs.db
 # Testing / caches
 .pytest_cache/
 .mypy_cache/
+datainsert.py
 
 # Build / distribution
 build/

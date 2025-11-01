@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHDS Admin - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+
+        .api-test {
+            margin-top: 20px;
+        }
+
+        .api-response {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .loading {
+            color: #667eea;
+            font-style: italic;
+        }
+
+        .error {
+            color: #dc3545;
+        }
+
+        .success {
+            color: #28a745;
+        }
+    </style>
+    </head>
+    <body>
+    <div class="header">
+        <div class="header-content">
+            <h1>SHDS Admin Dashboard</h1>
+            <div class="user-info">
+                <img class="user-avatar" id="userAvatar" src="" alt="User">
+                <span id="userName">Loading...</span>
+                <button class="btn btn-danger" id="logoutBtn">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Welcome to SHDS Admin</h2>
+            <p>You are successfully authenticated with Firebase!</p>
+            <p><strong>User Email:</strong> <span id="userEmail"></span></p>
+            <p><strong>User ID:</strong> <span id="userId"></span></p>
+        </div>
+
+        <div class="card">
+            <h2>API Test</h2>
+            <p>Test authenticated API calls to your backend</p>
+            
+            <div class="api-test">
+                <button class="btn" id="testApiBtn">Test API Call (GET /students)</button>
+                <div class="api-response" id="apiResponse" style="display: none;">
+                    <strong>Response:</strong>
+                    <pre id="apiResponseContent"></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Token Information</h2>
+            <p>Your Firebase ID token (used for API authentication):</p>
+            <div class="api-response">
+                <pre id="tokenDisplay"></pre>
+            </div>
+            <button class="btn" id="copyTokenBtn" style="margin-top: 10px;">Copy Token</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged,
+            signOut
+        } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC-9juHGlihMTL10one9WKb8t_QRzEMPpk",
+            authDomain: "primeval-gizmo-474808-m7.firebaseapp.com",
+            projectId: "primeval-gizmo-474808-m7",
+            storageBucket: "primeval-gizmo-474808-m7.firebasestorage.app",
+            messagingSenderId: "720912597513",
+            appId: "1:720912597513:web:49846f810668037e692ed8"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // API Base URL - Update with your backend URL
+        const API_BASE_URL = 'http://localhost:8000';
+
+        let currentToken = null;
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentToken = await user.getIdToken();
+                
+                document.getElementById('userName').textContent = user.displayName || 'User';
+                document.getElementById('userEmail').textContent = user.email;
+                document.getElementById('userId').textContent = user.uid;
+                document.getElementById('userAvatar').src = user.photoURL || 'https://via.placeholder.com/40';
+                document.getElementById('tokenDisplay').textContent = currentToken;
+            } else {
+                window.location.href = 'login.html';
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                localStorage.removeItem('firebase_token');
+                window.location.href = 'login.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('Failed to logout');
+            }
+        });
+
+        document.getElementById('copyTokenBtn').addEventListener('click', () => {
+            navigator.clipboard.writeText(currentToken).then(() => {
+                const btn = document.getElementById('copyTokenBtn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        });
+
+        document.getElementById('testApiBtn').addEventListener('click', async () => {
+            const responseDiv = document.getElementById('apiResponse');
+            const responseContent = document.getElementById('apiResponseContent');
+            
+            responseDiv.style.display = 'block';
+            responseContent.innerHTML = '<span class="loading">Making API request...</span>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/students`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-firebase-token': currentToken
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    responseContent.innerHTML = `<span class="success">Success! Status: ${response.status}</span>\n\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    responseContent.innerHTML = `<span class="error">Error! Status: ${response.status}</span>\n\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                responseContent.innerHTML = `<span class="error">Error!</span>\n\n${error.message}\n\nMake sure your backend is running at ${API_BASE_URL}`;
+            }
+        });
+    </script>
+    </body>
+    </html>

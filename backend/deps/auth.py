@@ -6,6 +6,7 @@ import os
 import firebase_admin
 from fastapi import Header, HTTPException, status
 from firebase_admin import auth as fb_auth
+from reps.firestore import fs
 
 
 if not firebase_admin._apps:

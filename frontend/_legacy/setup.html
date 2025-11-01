@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Setup - SHDS Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .setup-container { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); width: 100%; max-width: 500px; }
+        .setup-header { text-align: center; margin-bottom: 30px; }
+        .setup-header h1 { color: #333; font-size: 28px; margin-bottom: 10px; }
+        .setup-header p { color: #666; font-size: 14px; }
+        .user-card { background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 25px; }
+        .user-card h3 { color: #333; font-size: 16px; margin-bottom: 10px; }
+        .user-card p { color: #666; font-size: 14px; margin: 5px 0; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; color: #333; font-size: 14px; margin-bottom: 8px; font-weight: 500; }
+        .form-group input, .form-group select { width: 100%; padding: 12px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; transition: border-color 0.3s; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #667eea; }
+        .checkbox-group { display: flex; flex-direction: column; gap: 10px; }
+        .checkbox-item { display: flex; align-items: center; gap: 10px; }
+        .checkbox-item input[type="checkbox"] { width: auto; cursor: pointer; }
+        .checkbox-item label { margin: 0; cursor: pointer; font-weight: normal; }
+        .btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+        .btn:active { transform: translateY(0); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .error-message { background: #fee; color: #c33; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 14px; display: none; }
+        .error-message.show { display: block; }
+        .success-message { background: #efe; color: #3c3; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 14px; display: none; }
+        .success-message.show { display: block; }
+        .back-link { text-align: center; margin-top: 20px; }
+        .back-link a { color: #667eea; text-decoration: none; font-size: 14px; }
+        .back-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-header">
+            <h1>User Profile Setup</h1>
+            <p>Configure your roles and branch access</p>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+
+        <div class="user-card" id="userCard" style="display: none;">
+            <h3>Current User</h3>
+            <p><strong>Email:</strong> <span id="userEmail"></span></p>
+            <p><strong>UID:</strong> <span id="userId"></span></p>
+        </div>
+
+        <form id="setupForm">
+            <div class="form-group">
+                <label for="branchId">Branch ID</label>
+                <input type="text" id="branchId" name="branchId" required placeholder="Enter branch ID (e.g., 1, branch_001)">
+            </div>
+
+            <div class="form-group">
+                <label>Roles</label>
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="roleAdmin" name="roles" value="admin">
+                        <label for="roleAdmin">Admin - Full system access</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="roleStaff" name="roles" value="staff">
+                        <label for="roleStaff">Staff - Branch-level access</label>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn" id="setupBtn">Complete Setup</button>
+        </form>
+
+        <div class="back-link">
+            <a href="dashboard.html">← Back to Dashboard</a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC-9juHGlihMTL10one9WKb8t_QRzEMPpk",
+            authDomain: "primeval-gizmo-474808-m7.firebaseapp.com",
+            projectId: "primeval-gizmo-474808-m7",
+            storageBucket: "primeval-gizmo-474808-m7.firebasestorage.app",
+            messagingSenderId: "720912597513",
+            appId: "1:720912597513:web:49846f810668037e692ed8"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const API_BASE_URL = 'http://localhost:8000';
+        let currentToken = null;
+
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorMessage.classList.add('show');
+            document.getElementById('successMessage').classList.remove('show');
+            setTimeout(() => { errorMessage.classList.remove('show'); }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successMessage = document.getElementById('successMessage');
+            successMessage.textContent = message;
+            successMessage.classList.add('show');
+            document.getElementById('errorMessage').classList.remove('show');
+        }
+
+        function toggleLoading(isLoading) {
+            const setupBtn = document.getElementById('setupBtn');
+            setupBtn.disabled = isLoading;
+            setupBtn.textContent = isLoading ? 'Setting up...' : 'Complete Setup';
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentToken = await user.getIdToken();
+                document.getElementById('userCard').style.display = 'block';
+                document.getElementById('userEmail').textContent = user.email;
+                document.getElementById('userId').textContent = user.uid;
+            } else {
+                window.location.href = 'login.html';
+            }
+        });
+
+        document.getElementById('setupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            toggleLoading(true);
+
+            const branchId = document.getElementById('branchId').value;
+            const roleCheckboxes = document.querySelectorAll('input[name="roles"]:checked');
+            const roles = Array.from(roleCheckboxes).map(cb => cb.value);
+
+            if (roles.length === 0) {
+                showError('Please select at least one role');
+                toggleLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/users/setup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-firebase-token': currentToken },
+                    body: JSON.stringify({ branchId, roles })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showSuccess('User setup complete! Redirecting to dashboard...');
+                    setTimeout(() => { window.location.href = 'dashboard.html'; }, 2000);
+                } else {
+                    showError(data.detail || 'Failed to setup user profile');
+                }
+            } catch (error) {
+                console.error('Setup error:', error);
+                showError(`Failed to setup user: ${error.message}`);
+            } finally {
+                toggleLoading(false);
+            }
+        });
+    </script>
+</body>
+</html>
