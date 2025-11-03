@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
-from deps.auth import get_user
-from services.users import setup_user_profile, get_user_profile
 from pydantic import BaseModel
+
+from backend.deps.auth import get_user
+from backend.services.users import get_user_profile, setup_user_profile
 
 r = APIRouter(prefix="/users", tags=["users"])
 

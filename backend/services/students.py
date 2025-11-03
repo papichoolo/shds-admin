@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
-from models.students import StudentCreate, Student
-from reps.firestore import fs
+
+from backend.models.students import Student, StudentCreate
+from backend.reps.firestore import fs
 
 def create_student(dto: StudentCreate, actor_uid: str) -> Student:
     now = datetime.now(timezone.utc)

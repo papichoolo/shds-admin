@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from models.students import StudentCreate, Student
-from services.students import create_student, list_students as list_students_service
-from deps.auth import get_user
+
+from backend.deps.auth import get_user
+from backend.models.students import StudentCreate, Student
+from backend.services.students import (
+    create_student,
+    list_students as list_students_service,
+)
 
 r = APIRouter(prefix="/students", tags=["students"])
 

@@ -1,5 +1,6 @@
 """User management service."""
-from reps.firestore import fs
+
+from backend.reps.firestore import fs
 
 def setup_user_profile(uid: str, branch_id: str, roles: list[str]) -> dict:
     """Create or update user profile in Firestore."""

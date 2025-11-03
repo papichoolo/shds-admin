@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import os
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from textwrap import indent
 from typing import Iterable
@@ -23,6 +23,16 @@ if importlib.util.find_spec("dotenv"):
 
 
 @dataclass(frozen=True)
+class RelationshipSpec:
+    """Describe how this collection links to another Firestore collection."""
+
+    field: str
+    target_collection: str
+    cardinality: str
+    description: str
+
+
+@dataclass(frozen=True)
 class CollectionSpec:
     """Describe a Firestore collection and a seed document example."""
 
@@ -31,10 +41,82 @@ class CollectionSpec:
     key_fields: tuple[str, ...]
     notes: str
     sample_document: dict[str, object]
+    relationships: tuple[RelationshipSpec, ...] = ()
 
 
 COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
     "Structural": (
+        CollectionSpec(
+            name="branches",
+            purpose="Define physical or virtual centers where batches operate.",
+            key_fields=("name", "code", "timezone", "isActive", "address"),
+            notes="Branch IDs anchor scheduling, staffing, guardian communication, and billing context.",
+            sample_document={
+                "name": "Koramangala Center",
+                "code": "KRM001",
+                "timezone": "Asia/Kolkata",
+                "address": {
+                    "line1": "123 Residency Road",
+                    "city": "Bengaluru",
+                    "state": "KA",
+                    "postalCode": "560029",
+                },
+                "contact": {
+                    "phone": "+91-90000-22222",
+                    "email": "koramangala@school.example",
+                },
+                "isActive": True,
+                "managerStaffId": "staff_uid_001",
+            },
+            relationships=(
+                RelationshipSpec(
+                    field="managerStaffId",
+                    target_collection="staff",
+                    cardinality="many-to-one",
+                    description="Points to the staff member responsible for running the branch.",
+                ),
+            ),
+        ),
+        CollectionSpec(
+            name="students",
+            purpose="Store student profiles, statuses, and links to guardians and branches.",
+            key_fields=("firstName", "lastName", "branchId", "status", "guardianLinks"),
+            notes="Student documents power enrollments, attendance tracking, and invoicing.",
+            sample_document={
+                "firstName": "Ananya",
+                "lastName": "Sharma",
+                "branchId": "branch_001",
+                "status": "active",
+                "dateOfBirth": "2011-08-15",
+                "gender": "female",
+                "contact": {
+                    "phone": "+91-98888-33333",
+                    "email": "ananya.sharma@example.com",
+                },
+                "guardianLinks": [
+                    {
+                        "guardianId": "guardian_xyz123",
+                        "relationship": "Mother",
+                        "primary": True,
+                    }
+                ],
+                "notes": "Peanut allergy. Keep medication handy.",
+            },
+            relationships=(
+                RelationshipSpec(
+                    field="branchId",
+                    target_collection="branches",
+                    cardinality="many-to-one",
+                    description="Each student belongs to a home branch for scheduling and billing.",
+                ),
+                RelationshipSpec(
+                    field="guardianLinks[].guardianId",
+                    target_collection="guardians",
+                    cardinality="many-to-many",
+                    description="Connects students to one or more guardian contacts.",
+                ),
+            ),
+        ),
         CollectionSpec(
             name="batches",
             purpose="Group students by academic batch or cohort per branch.",
@@ -45,6 +127,7 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                 "endDate",
                 "schedule",
                 "isActive",
+                "leadInstructorId",
             ),
             notes="Reference from enrollments so attendance and invoicing know which batch a student belongs to.",
             sample_document={
@@ -58,7 +141,22 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                     "endTime": "11:00",
                 },
                 "isActive": True,
+                "leadInstructorId": "staff_uid_987",
             },
+            relationships=(
+                RelationshipSpec(
+                    field="branchId",
+                    target_collection="branches",
+                    cardinality="many-to-one",
+                    description="Batches run within a specific branch.",
+                ),
+                RelationshipSpec(
+                    field="leadInstructorId",
+                    target_collection="staff",
+                    cardinality="many-to-one",
+                    description="Identifies the primary instructor assigned to the batch.",
+                ),
+            ),
         ),
         CollectionSpec(
             name="staff",
@@ -76,6 +174,14 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                 ],
                 "active": True,
             },
+            relationships=(
+                RelationshipSpec(
+                    field="branchRoles[].branchId",
+                    target_collection="branches",
+                    cardinality="many-to-many",
+                    description="Staff members can hold roles across multiple branches.",
+                ),
+            ),
         ),
         CollectionSpec(
             name="guardians",
@@ -90,6 +196,14 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                 "studentIds": ["student_abc123", "student_xyz987"],
                 "preferredChannel": "sms",
             },
+            relationships=(
+                RelationshipSpec(
+                    field="studentIds[]",
+                    target_collection="students",
+                    cardinality="one-to-many",
+                    description="One guardian record can be associated with multiple students.",
+                ),
+            ),
         ),
         CollectionSpec(
             name="enrollments",
@@ -115,6 +229,26 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                     "billingCycle": "monthly",
                 },
             },
+            relationships=(
+                RelationshipSpec(
+                    field="studentId",
+                    target_collection="students",
+                    cardinality="many-to-one",
+                    description="Enrollment belongs to a single student profile.",
+                ),
+                RelationshipSpec(
+                    field="batchId",
+                    target_collection="batches",
+                    cardinality="many-to-one",
+                    description="Specifies the batch the student attends.",
+                ),
+                RelationshipSpec(
+                    field="branchId",
+                    target_collection="branches",
+                    cardinality="many-to-one",
+                    description="Allows filtering enrollments by branch.",
+                ),
+            ),
         ),
     ),
     "Attendance": (
@@ -139,6 +273,26 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                 "recordedAt": "2025-04-08T09:05:00+05:30",
                 "notes": "Arrived on time.",
             },
+            relationships=(
+                RelationshipSpec(
+                    field="studentId",
+                    target_collection="students",
+                    cardinality="many-to-one",
+                    description="Attendance is recorded per student.",
+                ),
+                RelationshipSpec(
+                    field="batchId",
+                    target_collection="batches",
+                    cardinality="many-to-one",
+                    description="Sessions are tied to the batch schedule.",
+                ),
+                RelationshipSpec(
+                    field="recordedBy",
+                    target_collection="staff",
+                    cardinality="many-to-one",
+                    description="Identifies which staff member submitted the record.",
+                ),
+            ),
         ),
         CollectionSpec(
             name="attendanceSummaries",
@@ -163,6 +317,20 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                 "lateCount": 2,
                 "generatedAt": "2025-05-01T00:00:00Z",
             },
+            relationships=(
+                RelationshipSpec(
+                    field="studentId",
+                    target_collection="students",
+                    cardinality="many-to-one",
+                    description="Summaries belong to a single student.",
+                ),
+                RelationshipSpec(
+                    field="batchId",
+                    target_collection="batches",
+                    cardinality="many-to-one",
+                    description="Rollups are scoped to the relevant batch.",
+                ),
+            ),
         ),
     ),
     "Finance": (
@@ -190,6 +358,14 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                     {"description": "April tuition", "amount": 15000},
                 ],
             },
+            relationships=(
+                RelationshipSpec(
+                    field="enrollmentId",
+                    target_collection="enrollments",
+                    cardinality="many-to-one",
+                    description="Each invoice is tied to a single enrollment record.",
+                ),
+            ),
         ),
         CollectionSpec(
             name="payments",
@@ -205,6 +381,14 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                 "reference": "TXN123456789",
                 "status": "completed",
             },
+            relationships=(
+                RelationshipSpec(
+                    field="invoiceId",
+                    target_collection="invoices",
+                    cardinality="many-to-one",
+                    description="Payments settle an outstanding invoice.",
+                ),
+            ),
         ),
     ),
     "Operations": (
@@ -219,6 +403,20 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                 "branchScope": ["branch_001"],
                 "expiresAt": None,
             },
+            relationships=(
+                RelationshipSpec(
+                    field="staffId",
+                    target_collection="staff",
+                    cardinality="many-to-one",
+                    description="Applies the assignment to a specific staff profile.",
+                ),
+                RelationshipSpec(
+                    field="branchScope[]",
+                    target_collection="branches",
+                    cardinality="many-to-many",
+                    description="Limits the granted permissions to certain branches.",
+                ),
+            ),
         ),
         CollectionSpec(
             name="auditLogs",
@@ -240,6 +438,20 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                 "timestamp": "2025-04-08T09:00:00Z",
                 "metadata": {"branchId": "branch_001"},
             },
+            relationships=(
+                RelationshipSpec(
+                    field="actorId",
+                    target_collection="staff",
+                    cardinality="many-to-one",
+                    description="Captures which staff member performed the action.",
+                ),
+                RelationshipSpec(
+                    field="entityId",
+                    target_collection="varies",
+                    cardinality="many-to-one",
+                    description="Pairs with entityType to reference the affected record (students, batches, invoices, etc.).",
+                ),
+            ),
         ),
         CollectionSpec(
             name="notifications",
@@ -264,6 +476,14 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
                 "scheduledAt": "2025-04-05T10:00:00+05:30",
                 "sentAt": None,
             },
+            relationships=(
+                RelationshipSpec(
+                    field="recipient.id",
+                    target_collection="guardians|staff",
+                    cardinality="many-to-one",
+                    description="Recipient type determines whether the ID points to a guardian or staff document.",
+                ),
+            ),
         ),
         CollectionSpec(
             name="config",
@@ -281,7 +501,7 @@ COLLECTION_CATEGORIES: dict[str, tuple[CollectionSpec, ...]] = {
 }
 
 ROADMAP = (
-    "Start with structural collections (batches, staff, guardians, enrollments) so every student has context.",
+    "Start with structural collections (branches, students, batches, staff, guardians, enrollments) so every student has context.",
     "Layer in attendance by recording daily attendanceRecords and generating monthly attendanceSummaries.",
     "Introduce invoices and payments once tuition rules are defined to keep finance data consistent.",
     "Add Redis-backed caching or queues to accelerate operations such as attendance rollups and notifications.",
@@ -304,6 +524,12 @@ def format_spec(spec: CollectionSpec) -> str:
         f"Key fields: {', '.join(spec.key_fields)}",
         f"Notes: {spec.notes}",
     ]
+    if spec.relationships:
+        lines.append("Relationships:")
+        for rel in spec.relationships:
+            lines.append(
+                f"  - {rel.field} -> {rel.target_collection} ({rel.cardinality}) {rel.description}"
+            )
     return "\n".join(lines)
 
 
@@ -353,6 +579,7 @@ def ensure_firebase_app(credential_path: str | None, project_id: str | None) -> 
 def seed_firestore(
     credential_path: str | None,
     project_id: str | None,
+    database_id: str,
     doc_prefix: str,
     dry_run: bool,
 ) -> None:
@@ -367,6 +594,7 @@ def seed_firestore(
                 "keyFields": list(spec.key_fields),
                 "notes": spec.notes,
                 "sampleDocument": spec.sample_document,
+                "relationships": [asdict(rel) for rel in spec.relationships],
                 "generatedAt": timestamp,
             }
             path = f"{spec.name}/{doc_id}"
@@ -378,7 +606,7 @@ def seed_firestore(
     from firebase_admin import firestore
 
     ensure_firebase_app(credential_path, project_id)
-    client = firestore.client()
+    client = firestore.client(database_id=database_id)
 
     for spec in iter_specs():
         doc_id = f"{doc_prefix}_{spec.name}"
@@ -387,6 +615,7 @@ def seed_firestore(
             "keyFields": list(spec.key_fields),
             "notes": spec.notes,
             "sampleDocument": spec.sample_document,
+            "relationships": [asdict(rel) for rel in spec.relationships],
             "generatedAt": timestamp,
         }
         path = f"{spec.name}/{doc_id}"
@@ -424,6 +653,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Prefix for the placeholder document IDs (default: _schema).",
     )
     parser.add_argument(
+        "--database",
+        default="(default)",
+        help="Firestore database ID to target (default: (default)).",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview the writes that would occur when seeding without touching Firestore.",
@@ -441,6 +675,7 @@ def main() -> None:
         seed_firestore(
             credential_path=args.credentials,
             project_id=args.project,
+            database_id=args.database,
             doc_prefix=args.doc_prefix,
             dry_run=args.dry_run,
         )

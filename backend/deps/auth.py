@@ -6,7 +6,7 @@ import os
 import firebase_admin
 from fastapi import Header, HTTPException, status
 from firebase_admin import auth as fb_auth
-from reps.firestore import fs
+from backend.services.users import get_user_profile
 
 
 if not firebase_admin._apps:
@@ -42,8 +42,14 @@ def get_user(x_firebase_token: str | None = Header(default=None)) -> dict[str, s
             detail="invalid token",
         ) from exc
 
+    profile = get_user_profile(decoded["uid"]) or {}
+
+    roles = decoded.get("roles") or profile.get("roles") or []
+    branch_id = decoded.get("branchId") or profile.get("branchId")
+
     return {
         "uid": decoded["uid"],
-        "roles": decoded.get("roles", []),
-        "branchId": decoded.get("branchId"),
+        "roles": roles,
+        "branchId": branch_id,
+        "profile": profile or None,
     }
