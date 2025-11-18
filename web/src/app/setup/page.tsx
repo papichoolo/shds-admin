@@ -88,22 +88,22 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 p-4 sm:p-6">
+      <Card className="w-full max-w-md sm:max-w-xl shadow-xl">
+        <CardHeader className="space-y-1 text-center sm:text-left">
           <CardTitle>User Invite Activation</CardTitle>
           <CardDescription>Use an invite token to auto-fill, or enter your details manually if you do not have one.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           <form onSubmit={onSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="token">Invite token</Label>
               <Input id="token" value={inviteToken} onChange={(e) => { setInviteToken(e.target.value); if (e.target.value) setManualMode(false); }} placeholder="gm14mLr0wF8..." />
               <p className="text-xs text-muted-foreground">Paste the invite token from your email. Leave empty to enter details manually.</p>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <input id="manual" type="checkbox" checked={manualMode} onChange={(e) => setManualMode(e.target.checked)} className="h-4 w-4 border rounded" />
-              <Label htmlFor="manual" className="text-sm">I don&apos;t have an invite token</Label>
+            <div className="flex items-start gap-2 text-sm">
+              <input id="manual" type="checkbox" checked={manualMode} onChange={(e) => setManualMode(e.target.checked)} className="mt-1 h-4 w-4 border rounded" />
+              <Label htmlFor="manual" className="text-sm leading-snug">I don&apos;t have an invite token</Label>
             </div>
             {manualMode && (
               <div className="grid gap-3 sm:grid-cols-2">

@@ -84,12 +84,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-zinc-50">
+      {menuOpen && <div className="fixed inset-0 bg-black/30 sm:hidden z-20" onClick={() => setMenuOpen(false)} />}
       <div className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
-        <div className="max-w-6xl mx-auto p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-2 sm:mb-0 gap-3">
+        <div className="max-w-6xl mx-auto p-3 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 sm:mb-0 gap-3 sm:gap-4">
             <div className="flex items-center gap-3">
               <div className="relative" ref={menuRef}>
-                <Button variant="secondary" size="icon" className="h-10 w-10" onClick={() => setMenuOpen((prev) => !prev)}>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-10 w-10"
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  aria-expanded={menuOpen}
+                  aria-haspopup="true"
+                >
                   {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
                 </Button>
                 {menuOpen && (
@@ -116,7 +124,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         </button>
                       ))}
                     </div>
-                    <div className="p-3 grid grid-cols-2 gap-2">
+                    <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Button variant="outline" size="sm" onClick={() => { setMenuOpen(false); router.push("/setup"); }}>Profile</Button>
                       <Button variant="destructive" size="sm" onClick={() => { setMenuOpen(false); logout(); }}>Logout</Button>
                     </div>
@@ -125,7 +133,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               <h1 className="text-lg sm:text-xl font-semibold">SHDS Admin Dashboard</h1>
             </div>
-            <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 self-end sm:self-auto">
               <div className="text-right leading-tight hidden sm:block">
                 <div className="text-sm font-semibold truncate">{displayName}</div>
                 <div className="text-xs text-white/90 truncate">{user?.email}</div>
@@ -142,7 +150,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-3 sm:p-4 space-y-4">
+      <div className="max-w-6xl mx-auto p-3 sm:p-5 space-y-4 sm:space-y-6">
         {children}
       </div>
     </div>

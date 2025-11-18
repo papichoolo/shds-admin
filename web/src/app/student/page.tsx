@@ -75,8 +75,8 @@ export default function StudentDashboard() {
   const guardianLinks = student?.guardianLinks || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
-      <div className="max-w-4xl mx-auto p-4 space-y-4">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-600 text-white pb-10">
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <p className="text-sm uppercase tracking-wide text-white/80">Student Portal</p>
