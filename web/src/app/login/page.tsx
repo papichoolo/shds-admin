@@ -6,10 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+
+const ADMINish = ["admin", "staff", "super_admin"];
+const STUDENTish = ["student", "guardian"];
 
 export default function LoginPage() {
   const { user, token, loading, loginWithEmail, loginWithGoogle } = useAuth();
@@ -18,19 +21,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const resolveHome = useMemo(() => {
+    return (roles?: string[] | null, branchId?: string | null) => {
+      if (!branchId) return "/setup";
+      if (roles?.some((role) => ADMINish.includes(role))) return "/dashboard";
+      if (roles?.some((role) => STUDENTish.includes(role))) return "/student";
+      return "/setup";
+    };
+  }, []);
+
   useEffect(() => {
     async function decide() {
       if (!loading && user && token) {
         try {
           const me = await apiFetch<{ uid: string; roles?: string[]; branchId?: string }>("/users/me", { method: "GET" }, token);
-          router.replace(me?.branchId ? "/dashboard" : "/setup");
+          router.replace(resolveHome(me?.roles, me?.branchId));
         } catch {
           router.replace("/setup");
         }
       }
     }
     decide();
-  }, [user, token, loading, router]);
+  }, [user, token, loading, router, resolveHome]);
 
   async function onEmailLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -86,7 +98,7 @@ export default function LoginPage() {
             Continue with Google
           </Button>
           <div className="mt-4 text-center text-sm">
-            <Link className="text-primary underline" href="/setup">New here? Complete setup</Link>
+            <Link className="text-primary underline" href="/setup">Have an invite token? Complete setup</Link>
           </div>
         </CardContent>
       </Card>

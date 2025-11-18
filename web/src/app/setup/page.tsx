@@ -5,24 +5,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-// add simple checkbox component as shadcn's Checkbox is not added by default in v4
-function SimpleCheckbox({ checked, onChange, id }: { checked: boolean; onChange: (v: boolean) => void; id: string }) {
-  return (
-    <input id={id} type="checkbox" className="size-4 border rounded" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-  );
-}
+const ADMINish = ["admin", "staff", "super_admin"];
+const STUDENTish = ["student", "guardian"];
 
 export default function SetupPage() {
   const { user, token, loading } = useAuth();
   const router = useRouter();
+  const params = useSearchParams();
+  const inviteFromUrl = params?.get("token") ?? "";
+  const [inviteToken, setInviteToken] = useState(inviteFromUrl);
+  const [displayName, setDisplayName] = useState("");
   const [branchId, setBranchId] = useState("");
-  const [roles, setRoles] = useState<{ admin: boolean; staff: boolean }>({ admin: false, staff: true });
+  const [manualRole, setManualRole] = useState<"student" | "guardian">("student");
+  const [manualMode, setManualMode] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setInviteToken(inviteFromUrl);
+  }, [inviteFromUrl]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -30,21 +36,50 @@ export default function SetupPage() {
     }
   }, [user, loading, router]);
 
+  const resolveHome = useMemo(() => {
+    return (roles?: string[], branch?: string | null) => {
+      if (!branch) return "/setup";
+      if (roles?.some((role) => ADMINish.includes(role))) return "/dashboard";
+      if (roles?.some((role) => STUDENTish.includes(role))) return "/student";
+      return "/setup";
+    };
+  }, []);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
-    if (!roles.admin && !roles.staff) {
-      toast.error("Pick at least one role");
+    const trimmed = inviteToken.trim();
+    const isManual = manualMode || trimmed === "" || trimmed === "-1";
+    if (isManual && !branchId.trim()) {
+      toast.error("Branch id is required");
+      return;
+    }
+    if (!isManual && !trimmed) {
+      toast.error("Enter the invite token from your email");
       return;
     }
     setBusy(true);
     try {
-      await apiFetch("/users/setup", {
-        method: "POST",
-        body: JSON.stringify({ branchId, roles: [roles.admin && "admin", roles.staff && "staff"].filter(Boolean) }),
-      }, token);
+      const body = isManual
+        ? {
+            inviteToken: "-1",
+            confirmedName: displayName || undefined,
+            branchId: branchId.trim(),
+            roles: [manualRole],
+            targetType: manualRole,
+          }
+        : { inviteToken: trimmed, confirmedName: displayName || undefined };
+
+      const result = await apiFetch<{ roles: string[]; branchId: string }>(
+        "/users/setup",
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+        token,
+      );
       toast.success("Setup complete");
-      router.replace("/dashboard");
+      router.replace(resolveHome(result?.roles, result?.branchId));
     } catch (e: any) {
       toast.error(e.message || "Setup failed");
     } finally {
@@ -56,27 +91,46 @@ export default function SetupPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>User Profile Setup</CardTitle>
-          <CardDescription>Configure your roles and branch access</CardDescription>
+          <CardTitle>User Invite Activation</CardTitle>
+          <CardDescription>Use an invite token to auto-fill, or enter your details manually if you do not have one.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="branch">Branch ID</Label>
-              <Input id="branch" value={branchId} onChange={(e) => setBranchId(e.target.value)} required placeholder="1 or branch_001" />
+              <Label htmlFor="token">Invite token</Label>
+              <Input id="token" value={inviteToken} onChange={(e) => { setInviteToken(e.target.value); if (e.target.value) setManualMode(false); }} placeholder="gm14mLr0wF8..." />
+              <p className="text-xs text-muted-foreground">Paste the invite token from your email. Leave empty to enter details manually.</p>
             </div>
+            <div className="flex items-center gap-2 text-sm">
+              <input id="manual" type="checkbox" checked={manualMode} onChange={(e) => setManualMode(e.target.checked)} className="h-4 w-4 border rounded" />
+              <Label htmlFor="manual" className="text-sm">I don&apos;t have an invite token</Label>
+            </div>
+            {manualMode && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="branchId">Branch ID</Label>
+                  <Input id="branchId" value={branchId} onChange={(e) => setBranchId(e.target.value)} placeholder="branch_001" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={manualRole} onValueChange={(val) => setManualRole(val as "student" | "guardian")}>
+                    <SelectTrigger id="role">
+                      <SelectValue placeholder="Choose role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="guardian">Guardian</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
-              <Label>Roles</Label>
-              <div className="flex items-center gap-2">
-                <SimpleCheckbox id="admin" checked={roles.admin} onChange={(v) => setRoles((r) => ({ ...r, admin: v }))} />
-                <Label htmlFor="admin" className="font-normal">Admin - Full access</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <SimpleCheckbox id="staff" checked={roles.staff} onChange={(v) => setRoles((r) => ({ ...r, staff: v }))} />
-                <Label htmlFor="staff" className="font-normal">Staff - Branch access</Label>
-              </div>
+              <Label htmlFor="displayName">Display name (optional)</Label>
+              <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="How should we address you?" />
             </div>
-            <Button type="submit" disabled={busy} className="w-full">{busy ? "Saving..." : "Complete Setup"}</Button>
+            <Button type="submit" disabled={busy || !token} className="w-full">{busy ? "Verifying..." : "Complete Setup"}</Button>
+            <p className="text-xs text-muted-foreground text-center">Need help? Ask the SHDS admin team to resend your invite.</p>
           </form>
         </CardContent>
       </Card>

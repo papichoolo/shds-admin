@@ -10,10 +10,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 os.environ["DEV_AUTH_BYPASS"] = "1"
+os.environ["SUPER_ADMIN_EMAILS"] = "ops@example.com"
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from backend.config import reset_settings_cache  # noqa: E402
+
+reset_settings_cache()
 
 from backend.main import app  # noqa: E402
 from backend.deps.auth import get_user as auth_dependency  # noqa: E402
@@ -107,18 +112,30 @@ def fake_firestore(monkeypatch: pytest.MonkeyPatch) -> FakeFirestoreClient:
     monkeypatch.setattr("backend.services.collections.fs", lambda: fake_client)
     monkeypatch.setattr("backend.services.students.fs", lambda: fake_client)
     monkeypatch.setattr("backend.services.users.fs", lambda: fake_client)
+    monkeypatch.setattr("backend.services.invites.fs", lambda: fake_client)
+
+    def _fake_send(payload, token):
+        return f"https://setup.local/invite?token={token}"
+
+    monkeypatch.setattr("backend.services.email.send_invite_email", _fake_send)
 
     return fake_client
 
 
 @pytest.fixture(autouse=True)
-def override_auth_dependency() -> None:
-    app.dependency_overrides[auth_dependency] = lambda: {
-        "uid": "dev",
-        "roles": ["admin", "staff"],
-        "branchId": "branch_demo_001",
-    }
-    yield
+def override_auth_dependency() -> Any:
+    def _set(user: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = user or {
+            "uid": "dev",
+            "roles": ["admin", "staff", "super_admin"],
+            "branchId": "branch_demo_001",
+            "email": "ops@example.com",
+        }
+        app.dependency_overrides[auth_dependency] = lambda: payload
+        return payload
+
+    _set()
+    yield _set
     app.dependency_overrides.pop(auth_dependency, None)
 
 
@@ -127,19 +144,42 @@ def client() -> TestClient:
     return TestClient(app)
 
 
-def test_setup_user_and_get_me(client: TestClient) -> None:
-    payload = {"branchId": "branch_demo_001", "roles": ["admin", "staff"]}
-    response = client.post("/users/setup", json=payload)
-    assert response.status_code == 200
-    body = response.json()
-    for field in ("uid", "branchId", "roles", "message"):
-        assert field in body
+def test_setup_user_and_get_me(client: TestClient, override_auth_dependency) -> None:
+    invite_payload = {
+        "email": "teacher@example.com",
+        "branchId": "branch_demo_001",
+        "roles": ["staff"],
+        "targetType": "staff",
+    }
+    response = client.post("/users/invites", json=invite_payload)
+    assert response.status_code == 201, response.text
+    invite = response.json()
+    assert invite["token"]
 
-    response = client.get("/users/me")
-    assert response.status_code == 200
-    me = response.json()
-    assert me["branchId"] == payload["branchId"]
-    assert "admin" in me["roles"]
+    override_auth_dependency(
+        {
+            "uid": "teacher_uid",
+            "roles": [],
+            "branchId": None,
+            "email": "teacher@example.com",
+        }
+    )
+
+    setup_resp = client.post(
+        "/users/setup", json={"inviteToken": invite["token"], "confirmedName": "Teacher"}
+    )
+    assert setup_resp.status_code == 200, setup_resp.text
+    body = setup_resp.json()
+    assert body["branchId"] == "branch_demo_001"
+    assert "staff" in body["roles"]
+
+    me_resp = client.get("/users/me")
+    assert me_resp.status_code == 200
+    me = me_resp.json()
+    assert me["branchId"] == "branch_demo_001"
+    assert "staff" in me["roles"]
+
+    override_auth_dependency()
 
 
 def _create_branch(client: TestClient) -> dict[str, Any]:

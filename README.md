@@ -1,6 +1,29 @@
 
 # SHDS Admin Backend Overview
 
+## Latest Updates (November 2025)
+- Config-driven Firestore + Firebase clients with structured JSON logging and pytest coverage (`backend/config.py`, `backend/logging_utils.py`, `tests/test_config.py`).
+- Secure invite-driven provisioning (`POST /users/invites`, `POST /users/setup`) with email hooks, audit history, and user profile enrichment stored in Firestore.
+- Frontend split between admin (/dashboard) and student/guardian (/student) experiences with invite-aware setup and role-based routing.
+
+## Running the stack
+1. Create a `.env` at the repo root or export the variables listed below. At minimum set `FIRESTORE_PROJECT_ID`, `FIRESTORE_DATABASE_ID`, `SUPER_ADMIN_EMAILS`, and (for local auth) `DEV_AUTH_BYPASS=1`.
+2. Install backend deps: `pip install -r requirements.txt` and launch with `uvicorn backend.main:app --reload`.
+3. Install and run the Next.js client under `web/`: `npm install && npm run dev`. Populate `web/.env.local` with your Firebase web config and `NEXT_PUBLIC_API_BASE` pointing to the FastAPI server.
+4. For testing run `python -m pytest` from the repo root. The Firestore client is auto-mocked via fixtures.
+
+### Key environment variables
+| Variable | Purpose |
+| --- | --- |
+| `FIRESTORE_PROJECT_ID` / `FIRESTORE_DATABASE_ID` | Target Firestore project + database name passed to the Google client. |
+| `FIREBASE_PROJECT_ID` / `FIREBASE_CREDENTIALS_FILE` | Enable Firebase Admin token verification without hard-coding project info. |
+| `SUPER_ADMIN_EMAILS` | Comma-separated list of emails allowed to create invites and approve provisioning. |
+| `INVITE_*`, `SMTP_*` | Optional email sender metadata (`INVITE_SENDER_EMAIL`, `INVITE_CALLBACK_BASE_URL`, `SMTP_HOST`, etc.). When unset invitations are logged instead of sent. |
+| `DEV_AUTH_BYPASS` | Returns a deterministic dev user for local testing. |
+
+See `docs/user-stories.md` for progress against the priority backlog.
+
+
 This repository holds a very small FastAPI service that currently exposes a single `/students` endpoint. The codebase already assumes Firebase Authentication for user identity and Google Firestore as the primary data store.
 
 ## What exists today
